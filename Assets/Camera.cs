@@ -2,42 +2,58 @@ using UnityEngine;
 
 public class CameraFollow : MonoBehaviour
 {
-    public Transform player;
-    public float smoothSpeed = 5f;
-    public Vector2 minBounds; 
-    public Vector2 maxBounds; 
-    public float orthographicSize = 5f; 
+    [SerializeField] private Transform player;
+    [SerializeField] private float smoothTime = 0.15f;
+    [SerializeField] private Vector2 minBounds;
+    [SerializeField] private Vector2 maxBounds;
+    [SerializeField] private float startOrthographicSize = 5f;
+
+    [Header("Zoom")]
+    [SerializeField] private float zoomDelaySeconds = 10f;
+    [SerializeField] private float targetSize = 4f;
+    [SerializeField] private float zoomSpeed = 1f;
+
     private Camera cam;
+    private Vector3 followVelocity = Vector3.zero;
+    private bool zoomStarted;
 
-    private float elapsedTime = 0f; 
-    public float zoomSpeed = 1f; 
-    public float targetSize = 4f; 
-    private bool zoomStarted = false; 
-
-    void Start()
+    private void Awake()
     {
-        cam = Camera.main;
-        cam.orthographicSize = orthographicSize; 
+        cam = GetComponent<Camera>();
+        if (cam == null) cam = Camera.main;
     }
 
-    void LateUpdate()
+    private void Start()
     {
+        if (cam != null) cam.orthographicSize = startOrthographicSize;
+    }
+
+    private void LateUpdate()
+    {
+        if (cam == null) return;
+
         if (player != null)
         {
-            float cameraHalfWidth = cam.orthographicSize * cam.aspect; 
-            float cameraHalfHeight = cam.orthographicSize; 
+            float halfH = cam.orthographicSize;
+            float halfW = halfH * cam.aspect;
 
-            Vector3 targetPosition = new Vector3(player.position.x, player.position.y, transform.position.z);
+            float minX = minBounds.x + halfW;
+            float maxX = maxBounds.x - halfW;
+            float minY = minBounds.y + halfH;
+            float maxY = maxBounds.y - halfH;
 
-            float clampedX = Mathf.Clamp(targetPosition.x, minBounds.x + cameraHalfWidth, maxBounds.x - cameraHalfWidth);
-            float clampedY = Mathf.Clamp(targetPosition.y, minBounds.y + cameraHalfHeight, maxBounds.y - cameraHalfHeight);
+            Vector3 target = new Vector3(player.position.x, player.position.y, transform.position.z);
 
-            Vector3 smoothPosition = new Vector3(clampedX, clampedY, transform.position.z);
-            transform.position = Vector3.Lerp(transform.position, smoothPosition, smoothSpeed * Time.deltaTime);
+            if (minX > maxX) target.x = (minBounds.x + maxBounds.x) * 0.5f;
+            else target.x = Mathf.Clamp(target.x, minX, maxX);
+
+            if (minY > maxY) target.y = (minBounds.y + maxBounds.y) * 0.5f;
+            else target.y = Mathf.Clamp(target.y, minY, maxY);
+
+            transform.position = Vector3.SmoothDamp(transform.position, target, ref followVelocity, smoothTime);
         }
 
-        elapsedTime += Time.deltaTime;
-        if (elapsedTime >= 10f && !zoomStarted)
+        if (!zoomStarted && Time.timeSinceLevelLoad >= zoomDelaySeconds)
         {
             zoomStarted = true;
         }
